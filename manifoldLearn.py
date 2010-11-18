@@ -14,22 +14,29 @@ except ImportError: print "Impossible to import necessary libraries"
 __name__ == "manifoldLearn"
 
 
-#class isomap:
-#    def __init__(self): pass
+class isomap:
+    def __init__(self): pass
 
 class pf:
+    """Perona and Freeman (1998)"""
     def __init__(self): pass
     # to do: SparseLinalg.eigen of AffinityMatrix 
 
 class sm:
+    """Shi and Malik (1997)"""
     def __init__(self): pass
     # Get laplacian and normalized Affinity Matrix
     # then do: SparseLinalg.eigen of Laplacian 
 
 class slh:
+    """Scott and Longuet-Higgins (1990)"""
     def __init__(self): pass
     # Get affinityMatrix then V then Q
     # to do: SparseLinalg.eigen of Q 
+
+class bn:
+    """Belkin and Niyogi (2001)"""
+    def __init__(self): pass
 
 class lle:
     
