@@ -4,7 +4,7 @@ spectral clustering, based on a geometrically inspired and locality preserving
 criterion, particularly suited for data lying on a low-dimensional manifold
 embedded in a high-dimensional space.
 
-NB Isomap algorithm in [1] is the only one pursuing a global optimal solution
+NB Isomap algorithm [7] is the only one pursuing a global optimal solution
    for nonlinear dimensionality reduction. 
 
 References:
