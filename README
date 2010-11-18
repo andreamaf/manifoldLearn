@@ -3,9 +3,15 @@ various algorithms performing nonlinear dimensionality reduction and so-called
 spectral clustering, based on a geometrically inspired and locality preserving
 criterion, particularly suited for data lying on a low-dimensional manifold
 embedded in a high-dimensional space.
+
 NB Isomap algorithm in [1] is the only one pursuing a global optimal solution
    for nonlinear dimensionality reduction. 
 
 References:
-[1] Tenenbaum, de Silva, Langford - A Global Geometric Framework for Nonlinear Dimensionality Reduction
-
+[1] Weiss. Segmentation using eigenvectors: a unifying view. Proceedings IEEE International Conference on Computer Vision p. 975-982 (1999).
+[2] Belkin, Niyogi. Laplacian Eigenmaps and Spectral Techniques for Embedding and Clustering. Advances in Neural Information Processing Systems 14, 2001, p. 586-691, MIT Press.
+[3] Meila, Shi. A random walks view of spectral segmentation. 8th International Workshop on Artificial Intelligence and Statistics (AISTATS), 2001.
+[4] Donoho, Grimes. Hessian eigenmaps: Locally linear embedding techniques for high-dimensional data. Proc Natl Acad Sci U S A. 2003 May 13; 100(10): 5591–5596.
+[5] Roweis, Saul. Nonlinear Dimensionality Reduction by Locally Linear Embedding. Science Vol 290, 22 December 2000, 2323–2326.
+[6] Saul, Roweis. An introduction to locally linear embedding. Technical Report, AT&T Labs and Gatsby Computational Neuroscience Unit, 2000. 
+[7] Tenenbaum, de Silva, Langford. A Global Geometric Framework for Nonlinear Dimensionality Reduction. Science 290, (2000), 2319–2323.
