@@ -1,0 +1,11 @@
+The present module manifoldLearn implements in Python programming language
+various algorithms performing nonlinear dimensionality reduction and so-called 
+spectral clustering, based on a geometrically inspired and locality preserving
+criterion, particularly suited for data lying on a low-dimensional manifold
+embedded in a high-dimensional space.
+NB Isomap algorithm in [1] is the only one pursuing a global optimal solution
+   for nonlinear dimensionality reduction. 
+
+References:
+[1] Tenenbaum, de Silva, Langford - A Global Geometric Framework for Nonlinear Dimensionality Reduction
+
