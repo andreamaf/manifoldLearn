@@ -1,13 +1,14 @@
 try:
     import numpy 
     import scipy
-    from scipy.spatial.distance import * #pdist, squareform
+    import scipy.spatial.distance as Dist
     import scipy.sparse as Sparse
     import scipy.linalg as Linalg
     import scipy.sparse.linalg as SparseLinalg
     import bisect
     import heapq
     import Queue
+    import itertools
 except ImportError: print "Impossible to import necessary libraries"
 
 
@@ -42,7 +43,7 @@ class lle:
     
     def __init__(self, k, d_out): self.k, self.d_out = k, d_out
     def __call__(self, X): return self.eigenmap(X)
-    def distance_metric(self): return euclidean
+    def distance_metric(self): return Dist.euclidean
     def eigenmap(self, X):
 
         W = self.getWNN(X) 
@@ -89,14 +90,30 @@ class lle:
         for _i, _p in enumerate(X): findWNN(_i,_p)
         return W
 
-def affinityMatrix(X, *args, **kwargs): pass
+def affinityMatrix(X, sigma = 1., dist_threshold = 1.5,
+                   distance_metric = Dist.euclidean):
+    ######################################################################
+    # TODO Check thresholding distances function in order to produce
+    #      a sparse W in output, similarly to Knn function
+    # OPEN Brute-force O(n^2)  
+    ######################################################################
+    dist, exp = distance_metric, numpy.exp
+    n = X.shape()[0] ; W = numpy.zeros((n, n))
+    it0, it1 = itertools.tee(X)
+    for i, p in enumerate(it0):
+        it1.next() ; it1, it2 = itertools.tee(it1)
+        for j, q in enumerate(it2, start=i+1):
+            d = dist((p,q))
+            if d >= dist_threshold: continue 
+            W[i,j] = W[j,i] = exp(-d/(2*sigma**2))
+    return W        
 
-def Knn(X, k, distance_metric = None):
+
+def Knn(X, k, distance_metric = Dist.euclidean):
     ######################################################################
     # OPEN Brute-force O(n^2) (no KD-tree)  
     ######################################################################
-    dist = euclidean
-    if distance_metric: dist = distance_metric
+    dist = distance_metric
     def KnnHeap(i, p):
         """Heap based sol."""
         ds, c = [], 0
