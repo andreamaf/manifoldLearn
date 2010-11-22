@@ -76,7 +76,7 @@ class lle:
         getNN = Knn(X, k, self.distance_metric())
         W = Sparse.lil_matrix((n, n))
         def findWNN(i, p):
-            ixNN = getNN[i] ; NN = X[ixNN] ; NN_p = p - NN
+            ixNN = [z for z, _ in getNN[i]] ; NN = X[ixNN] ; NN_p = p - NN
             Cx = scipy.dot(NN_p, NN_p.T)
             #CxInv = Linalg.inv(Cx) ; CxInvsum = CxInv.sum();
             #_Wx = CxInv.sum(axis=0) / CxInvsum
@@ -90,11 +90,33 @@ class lle:
         for _i, _p in enumerate(X): findWNN(_i,_p)
         return W
 
-def affinityMatrix(X, sigma = 1., dist_threshold = 1.5,
-                   distance_metric = Dist.euclidean):
+
+def AffinityMatrix(X, graph = "K", weight = "H"):
+    """There are various ways to build such matrix:
+       here I follow Belkin, Niyogi (2001), ref.2 in README:
+       - graph =="K" => K nearest neighborhoods 
+       - graph =="E" => Epsilon neighborhoods
+       - weight=="H" => Heat kernel
+       - weight=="S" => Simple-minded
+    """
     ######################################################################
-    # TODO Check thresholding distances function in order to produce
-    #      a sparse W in output, similarly to Knn function
+    # Graph
+    ######################################################################
+    # epsilon-n
+    if graph =="K": W = Epsnn(X)
+    elif graph =="E": W = Knn(X) 
+    ######################################################################
+    # weight
+    ######################################################################
+    if weight =="H": W = Epsnn(X)
+    elif weight =="<S-Del>SE": W = Knn(X)
+    return W
+
+def Epsnn(X, sigma = 1., dist_threshold = 1.5,
+          distance_metric = Dist.euclidean):
+    ######################################################################
+    # TODO Review the function to threshold distances in order to produce
+    #      a sparse W in output, as with Knn function
     # OPEN Brute-force O(n^2)  
     ######################################################################
     dist, exp = distance_metric, numpy.exp
@@ -114,19 +136,20 @@ def Knn(X, k, distance_metric = Dist.euclidean):
     # OPEN Brute-force O(n^2) (no KD-tree)  
     ######################################################################
     dist = distance_metric
-    def KnnHeap(i, p):
-        """Heap based sol."""
+    def _heap(i, p):
+        """Using a heap structure"""
         ds, c = [], 0
         for j, q in enumerate(X):
             if i == j: continue
+            d = dist(p,q)
             if c < k:
-                ds.append((1/dist(p,q), j)); c += 1
+                ds.append((1/d, j, d)); c += 1
                 if c == k: heapq.heapify(ds)
                 continue
-            heapq.heappushpop(ds, (1/dist(p,q), j))
-        return [j for _, j in ds]
-    def KnnBinSearch(i, p):
-        """Binary-search based solution"""
+            heapq.heappushpop(ds, (1/d, j, d))
+        return [(j, z) for _, j, z in ds]
+    def _binSearch(i, p):
+        """Using a k-length queue kept sorted with binary-search"""
         ds = [(numpy.Inf, None)] * k
         for j, q in enumerate(X):
             if i == j: continue
@@ -137,5 +160,5 @@ def Knn(X, k, distance_metric = Dist.euclidean):
             # NB Following commands order is mandatory
             ###########################################
             ds[ix+1:] = ds[ix:k-1] ; ds[ix] = tup
-        return [j for i, j in ds]  
-    return numpy.array([KnnHeap(i,p) for i,p in enumerate(X)])   
+        return [(j, d) for d, j in ds]  
+    return numpy.array([_heap(i,p) for i,p in enumerate(X)])   
