@@ -1,5 +1,6 @@
 import scipy.stats as stats
 from manifoldLearn import *
+from time import time
 
 try:
     import pkg_resources
@@ -11,10 +12,8 @@ finally:
 
 
 def S_shaped_data(samplesnr):
+    """The S-shaped manifold, from examples of Roweis, Saul (ref.6 in README)"""
 
-    ############################
-    # Building S-shaped dataset
-    ############################
     angle = stats.uniform.rvs(loc = 0, scale = 3*scipy.pi/2, size = samplesnr)
     radius = 1.
     circle = numpy.array([radius*scipy.cos(angle),radius*(1+scipy.sin(angle))])
@@ -33,7 +32,7 @@ if __name__ == "__main__":
     #X = numpy.array([(-20,-8),(-10,-1),(0,0.001),(10,1),(20,8),(11,-7),(12,21)])
     #eigenmap(X, 3, 3)
     
-    S = S_shaped_data(100)
+    S = S_shaped_data(200)
         
     """
     # 3D plot of S-shaped dataset
@@ -45,9 +44,10 @@ if __name__ == "__main__":
     ax.set_ylabel('Y Label')
     ax.set_zlabel('Z Label')
     """
-    
-    lleS = lle(12, 2)(S).T
-    
+    t_start = time()
+    lleS = lle(15, 2)(S).T
+    print "Time required: %f" % (time() - t_start)
+
     fig = plt.figure()
     plt.axis("equal")
     plt.plot(lleS[0], lleS[1], '.') 

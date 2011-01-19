@@ -51,11 +51,11 @@ class lle:
         W -= Sparse.identity(lenW, format = 'csr') ; W *= -1
         M = scipy.dot(W.T, W)
         ######################################################################
-        # OPEN: If k=d+1 (exactly what we need), eigen* func. returns very often 'nan',
-        #       so I ask more (useless) eivectors, then I get only the first [:,1:d+1].
-        # OPEN: In some cases, small (under abs()) eigenvalues are < 0 !!!
+        # TODO If k=d+1 (exactly what we need), eigenfunc often returns 'nan',
+        #      so I ask more eigenvectors, then taking only the first [:,1:d+1].
+        #      Ssme small eigenvalues can be < 0 !
         ######################################################################
-        eigval, eigvec = SparseLinalg.eigen_symmetric(M, k=self.d_out*10, which='SA', tol=1e-08)
+        eigval, eigvec = SparseLinalg.eigen_symmetric(M, k=self.d_out*10, which='SA')
         #print 'lowest eigvec first el.', eigvec[:d+1,:3], eigval before', eigval[:d+1]
         if eigvec[0][0]<0: eigvec *= -1
         eigval = eigval[1:self.d_out+1]
@@ -64,8 +64,7 @@ class lle:
         eigvec -= eigvec.mean(axis=0)
         eigvec /= eigvec.std(axis=0)
         ######################################################################
-        # OPEN: Do eigenvectors signs have to correspond to original data
-        #       (as proposed in the tutorial) ???
+        # OPEN: Do eigenvectors signs have to correspond to original data ??
         ######################################################################
         #print eigvec, eigvec.shape, eigvec.mean(axis=0), eigvec.var(axis=0)
         return eigvec
@@ -76,10 +75,10 @@ class lle:
         getNN = Knn(X, k, self.distance_metric())
         W = Sparse.lil_matrix((n, n))
         def findWNN(i, p):
-            ixNN = [z for z, _ in getNN[i]] ; NN = X[ixNN] ; NN_p = p - NN
+            ixNN = getNN[i]
+            NN = X[ixNN]
+            NN_p = p - NN
             Cx = scipy.dot(NN_p, NN_p.T)
-            #CxInv = Linalg.inv(Cx) ; CxInvsum = CxInv.sum();
-            #_Wx = CxInv.sum(axis=0) / CxInvsum
             ######################################################################
             # When k>D or data not in general positions => Cx's conditioning
             ######################################################################
@@ -117,7 +116,7 @@ def Epsnn(X, sigma = 1., dist_threshold = 1.5,
     ######################################################################
     # TODO Review the function to threshold distances in order to produce
     #      a sparse W in output, as with Knn function
-    # OPEN Brute-force O(n^2)  
+    #      Brute-force O(n^2)  
     ######################################################################
     dist, exp = distance_metric, numpy.exp
     n = X.shape()[0] ; W = numpy.zeros((n, n))
@@ -133,7 +132,7 @@ def Epsnn(X, sigma = 1., dist_threshold = 1.5,
 
 def Knn(X, k, distance_metric = Dist.euclidean):
     ######################################################################
-    # OPEN Brute-force O(n^2) (no KD-tree)  
+    # TODO Brute-force O(n^2) (no KD-tree)  
     ######################################################################
     dist = distance_metric
     def _heap(i, p):
@@ -143,22 +142,12 @@ def Knn(X, k, distance_metric = Dist.euclidean):
             if i == j: continue
             d = dist(p,q)
             if c < k:
-                ds.append((1/d, j, d)); c += 1
+                ds.append((1/d, j))
+                c += 1
                 if c == k: heapq.heapify(ds)
                 continue
-            heapq.heappushpop(ds, (1/d, j, d))
-        return [(j, z) for _, j, z in ds]
-    def _binSearch(i, p):
-        """Using a k-length queue kept sorted with binary-search"""
-        ds = [(numpy.Inf, None)] * k
-        for j, q in enumerate(X):
-            if i == j: continue
-            tup = (dist(p, q), j)    
-            ix = bisect.bisect(ds, tup)
-            if ix >= k: continue
-            ###########################################
-            # NB Following commands order is mandatory
-            ###########################################
-            ds[ix+1:] = ds[ix:k-1] ; ds[ix] = tup
-        return [(j, d) for d, j in ds]  
-    return numpy.array([_heap(i,p) for i,p in enumerate(X)])   
+            heapq.heappushpop(ds, (1/d, j))
+        return [heapq.heappop(ds)[1] for _ in xrange(k)][::-1]
+    def _sort(p):
+        return numpy.argsort(((X-p)**2).sum(1))[1:k+1]
+    return numpy.array(map(_sort, X))   
