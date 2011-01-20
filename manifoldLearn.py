@@ -5,10 +5,8 @@ try:
     import scipy.sparse as Sparse
     import scipy.linalg as Linalg
     import scipy.sparse.linalg as SparseLinalg
-    import bisect
-    import heapq
-    import Queue
     import itertools
+    from time import time
 except ImportError: print "Impossible to import necessary libraries"
 
 
@@ -45,19 +43,27 @@ class lle:
     def __call__(self, X): return self.eigenmap(X)
     def distance_metric(self): return Dist.euclidean
     def eigenmap(self, X):
-
-        W = self.getWNN(X) 
-        W.tocsr() ; lenW = W.shape[0]
-        W -= Sparse.identity(lenW, format = 'csr') ; W *= -1
+        
+        n, d = X.shape
+        W = Sparse.lil_matrix((n, n))
+        self.getWNN(W, X) 
+        W.tocsr()
+        W -= Sparse.identity(n, format = 'csr')
         M = scipy.dot(W.T, W)
         ######################################################################
         # TODO If k=d+1 (exactly what we need), eigenfunc often returns 'nan',
         #      so I ask more eigenvectors, then taking only the first [:,1:d+1].
         #      Ssme small eigenvalues can be < 0 !
         ######################################################################
-        eigval, eigvec = SparseLinalg.eigen_symmetric(M, k=self.d_out*10, which='SA')
-        #print 'lowest eigvec first el.', eigvec[:d+1,:3], eigval before', eigval[:d+1]
-        if eigvec[0][0]<0: eigvec *= -1
+        #t_start = time()
+        # eigval, eigvec = SparseLinalg.eigen_symmetric(M, k=self.d_out*10, which='SA')
+        _, eigval, eigvec = SparseLinalg.svd(W, k=n-1)
+        #_, eigval, eigvec = Linalg.svd(W.todense())
+        ixEig = numpy.argsort(eigval)
+        eigval = eigval[ixEig]
+        eigvec = eigvec[ixEig].T
+        # eigval, eigvec = Linalg.eigh(M.todense())
+        #print time()-t_start
         eigval = eigval[1:self.d_out+1]
         eigvec = eigvec[:,1:self.d_out+1]
         eigvec /= eigval
@@ -69,25 +75,22 @@ class lle:
         #print eigvec, eigvec.shape, eigvec.mean(axis=0), eigvec.var(axis=0)
         return eigvec
 
-    def getWNN(self, X):
+    def getWNN(self, W, X):
         k = self.k
-        n, d = X.shape    
-        getNN = Knn(X, k, self.distance_metric())
-        W = Sparse.lil_matrix((n, n))
-        def findWNN(i, p):
-            ixNN = getNN[i]
-            NN = X[ixNN]
-            NN_p = p - NN
+        rangek = range(k)
+        n, d = X.shape
+        funcKnn = Knn(X, k)
+        for i, p in enumerate(X):
+            ixNN = funcKnn(p)
+            NN_p = X[ixNN] - p
             Cx = scipy.dot(NN_p, NN_p.T)
             ######################################################################
             # When k>D or data not in general positions => Cx's conditioning
             ######################################################################
-            if k>d: Cx[range(k), range(k)] += 0.0001*numpy.trace(Cx)/k 
+            if k>d: Cx[rangek, rangek] += 0.0001*numpy.trace(Cx)/k 
             Wx = Linalg.solve(Cx, numpy.ones(k))
             Wx /= Wx.sum()
             W[[i]*k, ixNN] = Wx[:]
-        for _i, _p in enumerate(X): findWNN(_i,_p)
-        return W
 
 
 def AffinityMatrix(X, graph = "K", weight = "H"):
@@ -130,24 +133,23 @@ def Epsnn(X, sigma = 1., dist_threshold = 1.5,
     return W        
 
 
-def Knn(X, k, distance_metric = Dist.euclidean):
+def Knn(X, k):
     ######################################################################
     # TODO Brute-force O(n^2) (no KD-tree)  
     ######################################################################
-    dist = distance_metric
-    def _heap(i, p):
-        """Using a heap structure"""
-        ds, c = [], 0
-        for j, q in enumerate(X):
-            if i == j: continue
-            d = dist(p,q)
-            if c < k:
-                ds.append((1/d, j))
-                c += 1
-                if c == k: heapq.heapify(ds)
-                continue
-            heapq.heappushpop(ds, (1/d, j))
-        return [heapq.heappop(ds)[1] for _ in xrange(k)][::-1]
-    def _sort(p):
-        return numpy.argsort(((X-p)**2).sum(1))[1:k+1]
-    return numpy.array(map(_sort, X))   
+    #def _heap(i, p):
+    #    """Using a heap structure"""
+    #    ds, c = [], 0
+    #    for j, q in enumerate(X):
+    #        if i == j: continue
+    #        d = dist(p,q)
+    #        if c < k:
+    #            ds.append((1/d, j))
+    #            c += 1
+    #            if c == k: heapq.heapify(ds)
+    #            continue
+    #        heapq.heappushpop(ds, (1/d, j))
+    #    return [heapq.heappop(ds)[1] for _ in xrange(k)][::-1]
+    def _sortnn(p):
+        return numpy.argsort(((X-p)**2).sum(axis=1))[1:k+1]
+    return _sortnn   

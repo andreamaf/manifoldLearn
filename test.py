@@ -46,7 +46,7 @@ if __name__ == "__main__":
     """
     t_start = time()
     lleS = lle(15, 2)(S).T
-    print "Time required: %f" % (time() - t_start)
+    print "Time required: %fs" % (time() - t_start)
 
     fig = plt.figure()
     plt.axis("equal")
