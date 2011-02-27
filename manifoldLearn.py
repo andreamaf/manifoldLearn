@@ -1,144 +1,124 @@
-try:
-    import numpy 
-    import scipy
-    import scipy.spatial.distance as Dist
-    import scipy.sparse as Sparse
-    import scipy.linalg as Linalg
-    import scipy.sparse.linalg as SparseLinalg
-    import itertools
-    from time import time
-except ImportError: print "Impossible to import necessary libraries"
+import itertools
+import numpy 
+import scipy
+import scipy.spatial.distance as Dist
+import scipy.sparse as Sparse
+import scipy.linalg as Linalg
+import scipy.sparse.linalg as SparseLinalg
+from time import time
 
 
 __name__ == "manifoldLearn"
 
 
 class isomap:
+    
     def __init__(self): pass
 
 class pf:
     """Perona and Freeman (1998)"""
+    
     def __init__(self): pass
-    # to do: SparseLinalg.eigen of AffinityMatrix 
+    # todo: SparseLinalg.eigen of AffinityMatrix 
 
 class sm:
     """Shi and Malik (1997)"""
+    
     def __init__(self): pass
     # Get laplacian and normalized Affinity Matrix
-    # then do: SparseLinalg.eigen of Laplacian 
+    # todo: SparseLinalg.eigen of Laplacian 
 
 class slh:
     """Scott and Longuet-Higgins (1990)"""
+    
     def __init__(self): pass
     # Get affinityMatrix then V then Q
-    # to do: SparseLinalg.eigen of Q 
+    # todo: SparseLinalg.eigen of Q 
 
 class bn:
     """Belkin and Niyogi (2001)"""
+    
     def __init__(self): pass
 
 class lle:
     
     def __init__(self, k, d_out): self.k, self.d_out = k, d_out
+    
     def __call__(self, X): return self.eigenmap(X)
+    
     def distance_metric(self): return Dist.euclidean
+    
     def eigenmap(self, X):
         
+        #t_start = time()
         n, d = X.shape
-        W = Sparse.lil_matrix((n, n))
+        W = Sparse.lil_matrix((n, n), dtype = 'float')
         self.getWNN(W, X) 
         W.tocsr()
         W -= Sparse.identity(n, format = 'csr')
-        M = scipy.dot(W.T, W)
-        ######################################################################
-        # TODO If k=d+1 (exactly what we need), eigenfunc often returns 'nan',
-        #      so I ask more eigenvectors, then taking only the first [:,1:d+1].
-        #      Ssme small eigenvalues can be < 0 !
-        ######################################################################
-        #t_start = time()
-        # eigval, eigvec = SparseLinalg.eigen_symmetric(M, k=self.d_out*10, which='SA')
-        _, eigval, eigvec = SparseLinalg.svd(W, k=n-1)
-        #_, eigval, eigvec = Linalg.svd(W.todense())
-        ixEig = numpy.argsort(eigval)
-        eigval = eigval[ixEig]
-        eigvec = eigvec[ixEig].T
-        # eigval, eigvec = Linalg.eigh(M.todense())
+        M = W.T * W #scipy.dot(W.T, W)
         #print time()-t_start
+        
+        #################################################################
+        # With k=d+1 (what we need), eigensolver gives unstable results,
+        # so an higher nr of eigenvectors _k is put in input.
+        #################################################################
+        #t_start = time()
+        try:
+            _k = self.d_out*10
+            if float(scipy.__version__[:3]) > .8:
+                eigval, eigvec = SparseLinalg.arpack.eigsh(M, k=_k, which='SM')
+                #_, eigval, eigvec = SparseLinalg.svds(W, k=n-1)
+            else:
+                eigval, eigvec = SparseLinalg.arpack.eigen_symmetric(M, k=_k, which='SM')
+                #_, eigval, eigvec = SparseLinalg.arpack.svd(W, k=n-1)
+        except SparseLinalg.arpack.ArpackNoConvergence as excobj:
+            print "ARPACK iteration did not converge"
+            eigval, eigvec = excobj.eigenvalues, excobj.eigenvectors
+            eigval = scipy.hstack((eigval, numpy.zeros(_k-eigval.shape[0])))
+            eigvec = scipy.hstack((eigvec, numpy.zeros((n,_k-eigvec.shape[1]))))
+            # If eigval/eigvec pairs are not sorted based on eigvals value
+            #ixEig = numpy.argsort(eigval)
+            #eigval = eigval[ixEig]
+            #eigvec = eigvec[:,ixEig]
+        #print time()-t_start
+        
         eigval = eigval[1:self.d_out+1]
         eigvec = eigvec[:,1:self.d_out+1]
+        
         eigvec /= eigval
         eigvec -= eigvec.mean(axis=0)
         eigvec /= eigvec.std(axis=0)
-        ######################################################################
-        # OPEN: Do eigenvectors signs have to correspond to original data ??
-        ######################################################################
-        #print eigvec, eigvec.shape, eigvec.mean(axis=0), eigvec.var(axis=0)
+        #print eigvec,eigvec.shape,eigvec.mean(axis=0),eigvec.var(axis=0)
         return eigvec
 
     def getWNN(self, W, X):
-        k = self.k
-        rangek = range(k)
         n, d = X.shape
-        funcKnn = Knn(X, k)
+        k = self.k
+        I = numpy.ones(k)
+        diagIx = numpy.diag_indices(k)
+        _Knn = Knn(X, k)
         for i, p in enumerate(X):
-            ixNN = funcKnn(p)
+            ixNN = _Knn(p)
             NN_p = X[ixNN] - p
             Cx = scipy.dot(NN_p, NN_p.T)
-            ######################################################################
-            # When k>D or data not in general positions => Cx's conditioning
-            ######################################################################
-            if k>d: Cx[rangek, rangek] += 0.0001*numpy.trace(Cx)/k 
-            Wx = Linalg.solve(Cx, numpy.ones(k))
+            ##############################################################
+            # If k>D or data not in general positions => Cx's conditioning
+            ##############################################################
+            if k>d: Cx[diagIx] += 0.0001*numpy.trace(Cx)/k 
+            Wx = Linalg.solve(Cx, I)
             Wx /= Wx.sum()
-            W[[i]*k, ixNN] = Wx[:]
-
-
-def AffinityMatrix(X, graph = "K", weight = "H"):
-    """There are various ways to build such matrix:
-       here I follow Belkin, Niyogi (2001), ref.2 in README:
-       - graph =="K" => K nearest neighborhoods 
-       - graph =="E" => Epsilon neighborhoods
-       - weight=="H" => Heat kernel
-       - weight=="S" => Simple-minded
-    """
-    ######################################################################
-    # Graph
-    ######################################################################
-    # epsilon-n
-    if graph =="K": W = Epsnn(X)
-    elif graph =="E": W = Knn(X) 
-    ######################################################################
-    # weight
-    ######################################################################
-    if weight =="H": W = Epsnn(X)
-    elif weight =="<S-Del>SE": W = Knn(X)
-    return W
-
-def Epsnn(X, sigma = 1., dist_threshold = 1.5,
-          distance_metric = Dist.euclidean):
-    ######################################################################
-    # TODO Review the function to threshold distances in order to produce
-    #      a sparse W in output, as with Knn function
-    #      Brute-force O(n^2)  
-    ######################################################################
-    dist, exp = distance_metric, numpy.exp
-    n = X.shape()[0] ; W = numpy.zeros((n, n))
-    it0, it1 = itertools.tee(X)
-    for i, p in enumerate(it0):
-        it1.next() ; it1, it2 = itertools.tee(it1)
-        for j, q in enumerate(it2, start=i+1):
-            d = dist((p,q))
-            if d >= dist_threshold: continue 
-            W[i,j] = W[j,i] = exp(-d/(2*sigma**2))
-    return W        
+            #t_start=time()
+            W[i, ixNN] = Wx #[:]
+            #print time()-t_start
 
 
 def Knn(X, k):
-    ######################################################################
-    # TODO Brute-force O(n^2) (no KD-tree)  
-    ######################################################################
+    ##############################################################
+    # TODO Brute-force O(N^2*logN) (no KD-tree)  
+    ##############################################################
     #def _heap(i, p):
-    #    """Using a heap structure"""
+    #    """Using a heap structure to get first K neighbours"""
     #    ds, c = [], 0
     #    for j, q in enumerate(X):
     #        if i == j: continue
@@ -153,3 +133,37 @@ def Knn(X, k):
     def _sortnn(p):
         return numpy.argsort(((X-p)**2).sum(axis=1))[1:k+1]
     return _sortnn   
+
+def AffinityMatrix(X, graph = "K", weight = "H"):
+    """Affinity Matrix can be built in different ways:
+       see Belkin, Niyogi (2001) as reference.
+       - graph  == "K" => K nearest neighborhoods 
+       - graph  == "E" => Epsilon neighborhoods
+       - weight == "H" => Heat kernel
+       - weight == "S" => Simple-minded
+    """
+    
+    pass
+
+def Epsnn(X, sigma = 1., dist_threshold = 1.5,
+          distance_metric = Dist.euclidean):
+    ######################################################################
+    # TODO Review the function to threshold distances in order to produce
+    #      a sparse W in output, as with Knn function
+    #      Brute-force O(n^2)  
+    ######################################################################
+    
+    pass
+    """
+    dist, exp = distance_metric, numpy.exp
+    n = X.shape()[0] ; W = numpy.zeros((n, n))
+    it0, it1 = itertools.tee(X)
+    for i, p in enumerate(it0):
+        it1.next() ; it1, it2 = itertools.tee(it1)
+        for j, q in enumerate(it2, start=i+1):
+            d = dist((p,q))
+            if d >= dist_threshold: continue 
+            W[i,j] = W[j,i] = exp(-d/(2*sigma**2))
+    return W        
+    """
+
