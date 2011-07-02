@@ -3,8 +3,8 @@ import numpy
 import scipy
 import scipy.spatial.distance as Dist
 import scipy.sparse as Sparse
-import scipy.linalg as Linalg
 import scipy.sparse.linalg as SparseLinalg
+import scipy.linalg as Linalg
 from time import time
 
 
@@ -60,17 +60,20 @@ class lle:
         #print time()-t_start
         
         #################################################################
-        # With k=d+1 (what we need), eigensolver gives unstable results,
-        # so an higher nr of eigenvectors _k is put in input.
+        # If scipy.__version__<0.10: using k=d+1 eigensolver is unstable,
+        # so _k sets asks an higher nr of eigenvectors in input (d*10).
         #################################################################
         #t_start = time()
         try:
-            _k = self.d_out*10
-            if float(scipy.__version__[:3]) > .8:
-                eigval, eigvec = SparseLinalg.arpack.eigsh(M, k=_k, which='SM')
+            if scipy.__version__.split('.', 2)[1] == '10':
+                eigval, eigvec = SparseLinalg.eigsh(M, k=self.d_out+1, sigma=.0, tol=1e-7)
+            elif scipy.__version__.split('.', 2)[1] in ('8', '9'):
+                _k = self.d_out*10
+                eigval, eigvec = SparseLinalg.eigsh(M, k=_k, which='SM')
                 #_, eigval, eigvec = SparseLinalg.svds(W, k=n-1)
             else:
-                eigval, eigvec = SparseLinalg.arpack.eigen_symmetric(M, k=_k, which='SM')
+                _k = self.d_out*10
+                eigval, eigvec = Arpack.eigen_symmetric(M, k=_k, which='SM')
                 #_, eigval, eigvec = SparseLinalg.arpack.svd(W, k=n-1)
         except SparseLinalg.arpack.ArpackNoConvergence as excobj:
             print "ARPACK iteration did not converge"
@@ -81,7 +84,7 @@ class lle:
             #ixEig = numpy.argsort(eigval)
             #eigval = eigval[ixEig]
             #eigvec = eigvec[:,ixEig]
-        #print time()-t_start
+        #print 'Eigen-values/vectors found in %.6fs' % (time()-t_start)
         
         eigval = eigval[1:self.d_out+1]
         eigvec = eigvec[:,1:self.d_out+1]
@@ -115,7 +118,8 @@ class lle:
 
 def Knn(X, k):
     ##############################################################
-    # TODO Brute-force O(N^2*logN) (no KD-tree)  
+    # TODO Actually a brute-force O(N^2*logN), 
+    #      no KD-tree or asymptotically better solutions.  
     ##############################################################
     #def _heap(i, p):
     #    """Using a heap structure to get first K neighbours"""
