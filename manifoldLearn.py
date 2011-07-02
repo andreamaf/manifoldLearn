@@ -11,10 +11,6 @@ from time import time
 __name__ == "manifoldLearn"
 
 
-class isomap:
-    
-    def __init__(self): pass
-
 class pf:
     """Perona and Freeman (1998)"""
     
@@ -37,6 +33,10 @@ class slh:
 
 class bn:
     """Belkin and Niyogi (2001)"""
+    
+    def __init__(self): pass
+
+class isomap:
     
     def __init__(self): pass
 
