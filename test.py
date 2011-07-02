@@ -44,12 +44,11 @@ if __name__ == "__main__":
     S = S_shaped_data(500)
         
     t_start = time()
-    res = [[0],[0]] 
-
+    lleS = lle(15,2)(S).T
     print "Time required: %fs" % (time() - t_start)
     
     if _plot:
         fig = plt.figure()
         plt.axis("equal")
-        plt.plot(res[0], res[1], '.') 
+        plt.plot(lleS[0], lleS[1], '.') 
         plt.show()
