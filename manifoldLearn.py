@@ -3,8 +3,8 @@ import numpy
 import scipy
 import scipy.spatial.distance as Dist
 import scipy.sparse as Sparse
-import scipy.sparse.linalg as SparseLinalg
 import scipy.linalg as Linalg
+from eigensolver import solver
 from time import time
 
 
@@ -47,44 +47,17 @@ class lle:
     def __call__(self, X): return self.eigenmap(X)
     
     def distance_metric(self): return Dist.euclidean
-    
+   
     def eigenmap(self, X):
         
-        #t_start = time()
         n, d = X.shape
         W = Sparse.lil_matrix((n, n), dtype = 'float')
         self.getWNN(W, X) 
         W.tocsr()
         W -= Sparse.identity(n, format = 'csr')
         M = W.T * W #scipy.dot(W.T, W)
-        #print time()-t_start
         
-        #################################################################
-        # If scipy.__version__<0.10: using k=d+1 eigensolver is unstable,
-        # so _k sets asks an higher nr of eigenvectors in input (d*10).
-        #################################################################
-        #t_start = time()
-        try:
-            if scipy.__version__.split('.', 2)[1] == '10':
-                eigval, eigvec = SparseLinalg.eigsh(M, k=self.d_out+1, sigma=.0, tol=1e-7)
-            elif scipy.__version__.split('.', 2)[1] in ('8', '9'):
-                _k = self.d_out*10
-                eigval, eigvec = SparseLinalg.eigsh(M, k=_k, which='SM')
-                #_, eigval, eigvec = SparseLinalg.svds(W, k=n-1)
-            else:
-                _k = self.d_out*10
-                eigval, eigvec = Arpack.eigen_symmetric(M, k=_k, which='SM')
-                #_, eigval, eigvec = SparseLinalg.arpack.svd(W, k=n-1)
-        except SparseLinalg.arpack.ArpackNoConvergence as excobj:
-            print "ARPACK iteration did not converge"
-            eigval, eigvec = excobj.eigenvalues, excobj.eigenvectors
-            eigval = scipy.hstack((eigval, numpy.zeros(_k-eigval.shape[0])))
-            eigvec = scipy.hstack((eigvec, numpy.zeros((n,_k-eigvec.shape[1]))))
-            # If eigval/eigvec pairs are not sorted based on eigvals value
-            #ixEig = numpy.argsort(eigval)
-            #eigval = eigval[ixEig]
-            #eigvec = eigvec[:,ixEig]
-        #print 'Eigen-values/vectors found in %.6fs' % (time()-t_start)
+        eigval, eigvec = solver(M, self.d_out+1)
         
         eigval = eigval[1:self.d_out+1]
         eigvec = eigvec[:,1:self.d_out+1]
@@ -95,7 +68,7 @@ class lle:
         #print eigvec,eigvec.shape,eigvec.mean(axis=0),eigvec.var(axis=0)
         return eigvec
 
-    def getWNN(self, W, X):
+    def getWNN(self, W, X, eps=.0001):
         n, d = X.shape
         k = self.k
         I = numpy.ones(k)
@@ -108,12 +81,10 @@ class lle:
             ##############################################################
             # If k>D or data not in general positions => Cx's conditioning
             ##############################################################
-            if k>d: Cx[diagIx] += 0.0001*numpy.trace(Cx)/k 
+            if k>d: Cx[diagIx] += eps*numpy.trace(Cx)/k 
             Wx = Linalg.solve(Cx, I)
             Wx /= Wx.sum()
-            #t_start=time()
             W[i, ixNN] = Wx #[:]
-            #print time()-t_start
 
 
 def Knn(X, k):
